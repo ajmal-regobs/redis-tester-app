@@ -1,10 +1,10 @@
 import os
 import boto3
 import redis
-from dotenv import load_dotenv
+from flask import Flask, jsonify, request
 from botocore.signers import RequestSigner
 
-load_dotenv()
+app = Flask(__name__)
 
 REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
@@ -33,7 +33,6 @@ def generate_iam_auth_token():
         region_name=AWS_REGION,
     )
 
-    # Strip the protocol — Redis uses just the token part
     return url.removeprefix("https://")
 
 
@@ -54,42 +53,65 @@ def connect_redis():
     return client
 
 
-def main():
-    print(f"Connecting to Redis at {REDIS_HOST}:{REDIS_PORT}")
-    print(f"Using IAM user: {REDIS_USER}")
-    print()
+@app.route("/health")
+def health():
+    try:
+        client = connect_redis()
+        client.ping()
+        client.close()
+        return jsonify({"status": "healthy", "redis": "connected"}), 200
+    except Exception as e:
+        return jsonify({"status": "unhealthy", "redis": str(e)}), 503
 
-    client = connect_redis()
 
-    # Test 1: Ping
-    print("1. PING test...")
-    result = client.ping()
-    print(f"   PONG: {result}")
+@app.route("/write", methods=["POST"])
+def write():
+    try:
+        data = request.get_json()
+        key = data.get("key")
+        value = data.get("value")
 
-    # Test 2: SET/GET
-    print("2. SET/GET test...")
-    client.set("test-key", "hello-from-iam-auth")
-    value = client.get("test-key")
-    print(f"   SET test-key = 'hello-from-iam-auth'")
-    print(f"   GET test-key = '{value}'")
+        if not key or value is None:
+            return jsonify({"error": "key and value are required"}), 400
 
-    # Test 3: Delete
-    print("3. DELETE test...")
-    client.delete("test-key")
-    value = client.get("test-key")
-    print(f"   GET test-key after delete = {value}")
+        client = connect_redis()
+        client.set(key, value)
+        client.close()
 
-    # Test 4: Connection info
-    print("4. Connection info...")
-    info = client.info("server")
-    print(f"   Redis version: {info['redis_version']}")
-    print(f"   TLS enabled: {info.get('tls_enabled', 'N/A')}")
+        return jsonify({"key": key, "value": value, "status": "written"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
-    print()
-    print("All tests passed. Redis IAM auth is working.")
 
-    client.close()
+@app.route("/read/<key>", methods=["GET"])
+def read(key):
+    try:
+        client = connect_redis()
+        value = client.get(key)
+        client.close()
+
+        if value is None:
+            return jsonify({"key": key, "value": None, "status": "not found"}), 404
+
+        return jsonify({"key": key, "value": value, "status": "found"}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/read-all", methods=["GET"])
+def read_all():
+    try:
+        client = connect_redis()
+        keys = client.keys("*")
+        data = {}
+        for key in keys:
+            data[key] = client.get(key)
+        client.close()
+
+        return jsonify({"count": len(data), "data": data}), 200
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 if __name__ == "__main__":
-    main()
+    app.run(host="0.0.0.0", port=8080)
