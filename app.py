@@ -10,6 +10,7 @@ app = Flask(__name__)
 REDIS_HOST = os.getenv("REDIS_HOST")
 REDIS_PORT = int(os.getenv("REDIS_PORT", 6379))
 REDIS_USER = os.getenv("REDIS_USER")
+REDIS_CLUSTER_NAME = os.getenv("REDIS_CLUSTER_NAME")
 AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 
 
@@ -28,7 +29,7 @@ def generate_iam_auth_token():
     )
 
     url = signer.generate_presigned_url(
-        {"method": "GET", "url": f"https://{REDIS_HOST}", "body": {}, "headers": {}, "context": {}},
+        {"method": "GET", "url": f"https://{REDIS_CLUSTER_NAME}", "body": {}, "headers": {}, "context": {}},
         operation_name="connect",
         expires_in=900,
         region_name=AWS_REGION,
