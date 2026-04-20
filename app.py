@@ -29,7 +29,7 @@ def generate_iam_auth_token():
     )
 
     url = signer.generate_presigned_url(
-        {"method": "GET", "url": f"https://{REDIS_CLUSTER_NAME}", "body": {}, "headers": {}, "context": {}},
+        {"method": "GET", "url": f"https://{REDIS_CLUSTER_NAME}/?Action=connect&User={REDIS_USER}", "body": {}, "headers": {}, "context": {}},
         operation_name="connect",
         expires_in=900,
         region_name=AWS_REGION,
