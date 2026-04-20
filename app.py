@@ -3,6 +3,7 @@ import boto3
 import redis
 from flask import Flask, jsonify, request
 from botocore.signers import RequestSigner
+from botocore.model import ServiceId
 
 app = Flask(__name__)
 
@@ -18,7 +19,7 @@ def generate_iam_auth_token():
     credentials = session.get_credentials().get_frozen_credentials()
 
     signer = RequestSigner(
-        service_id="elasticache",
+        service_id=ServiceId("elasticache"),
         region_name=AWS_REGION,
         signing_name="elasticache",
         signature_version="v4",
@@ -61,6 +62,7 @@ def health():
         client.close()
         return jsonify({"status": "healthy", "redis": "connected"}), 200
     except Exception as e:
+        print(f"Health check failed: {e}", flush=True)
         return jsonify({"status": "unhealthy", "redis": str(e)}), 503
 
 
