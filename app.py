@@ -16,7 +16,7 @@ AWS_REGION = os.getenv("AWS_REGION", "us-east-1")
 def generate_iam_auth_token():
     """Generate a short-lived IAM auth token for ElastiCache Redis."""
     session = boto3.Session()
-    credentials = session.get_credentials().get_frozen_credentials()
+    credentials = session.get_credentials()
 
     signer = RequestSigner(
         service_id=ServiceId("elasticache"),
